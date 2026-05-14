@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://www.google.com",
+    "interval": "10s",
+    "timeout": "2s"
+  },
+  {
+    "url": "https://httpbin.org/delay/5",
+    "interval": "15s",
+    "timeout": "1s"
+  },
+  {
+    "url": "https://this-domain-should-not-exist-12345.com",
+    "interval": "5s",
+    "timeout": "3s"
+  },
+  {
+    "url": "https://httpbin.org/status/500",
+    "interval": "20s",
+    "timeout": "2s"
+  }
+]
