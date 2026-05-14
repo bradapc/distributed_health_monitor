@@ -16,4 +16,5 @@ func main() {
 	for i, tar := range targets {
 		fmt.Printf("%d: %s\n", i, tar.URL)
 	}
+
 }
