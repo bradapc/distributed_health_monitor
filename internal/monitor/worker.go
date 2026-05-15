@@ -20,7 +20,7 @@ const (
 )
 
 const FailureThreshold int = 3
-const TimeoutThreshold int = 10
+const TimeoutThreshold int = 60
 
 type Worker struct {
 	Target config.MonitorTarget
@@ -69,14 +69,14 @@ func (w *Worker) performCheck(ctx context.Context) {
 	latency := time.Since(start)
 
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Printf("LOG: \t   \t%s\tFAILURE %d\t[%s]\n\tERROR\t%s\n", latency, w.FailureCount+1, w.Target.URL, err.Error())
 		w.HandleFailure()
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
-		fmt.Printf("[%s] soft failure, status code in 5xx range\n", w.Target.URL)
+		fmt.Printf("LOG: \t%d\t%s\tFAILURE %d\t[%s]\n", resp.StatusCode, latency, w.FailureCount+1, w.Target.URL)
 		w.HandleFailure()
 		return
 	}
@@ -87,7 +87,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 
 	w.FailureCount = 0
 
-	fmt.Printf("[%s] Status: %d in time %s\n", w.Target.URL, resp.StatusCode, latency)
+	fmt.Printf("LOG: \t%d\t%s\tHEALTHY\t[%s]\n", resp.StatusCode, latency, w.Target.URL)
 
 	//LogResult(resp.StatusCode, latency)
 }
@@ -96,10 +96,8 @@ func (w *Worker) HandleFailure() {
 	w.FailureCount++
 	if w.CurrentState == HalfOpen {
 		w.CurrentState = Open
-		fmt.Printf("[%s] retry failed, cooling down again...\n", w.Target.URL)
 	} else if w.FailureCount == FailureThreshold {
 		w.CurrentState = Open
-		fmt.Printf("[%s] timed out 3x, cooling down...\n", w.Target.URL)
 	}
 	w.LastFailure = time.Now()
 }
