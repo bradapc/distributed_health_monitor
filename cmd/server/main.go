@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
+	"github.com/bradapc/distributed_health_monitor.git/internal/monitor"
 )
 
 func main() {
@@ -16,5 +18,12 @@ func main() {
 	for i, tar := range targets {
 		fmt.Printf("%d: %s\n", i, tar.URL)
 	}
+	dispatcher := monitor.NewDispatcher(targets)
+	ctx := context.Background()
 
+	for _, t := range targets {
+		dispatcher.StartWorker(ctx, t)
+	}
+
+	select {}
 }
