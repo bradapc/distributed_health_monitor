@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/monitor"
@@ -24,6 +25,9 @@ func main() {
 	for _, t := range targets {
 		dispatcher.StartWorker(ctx, t)
 	}
+
+	poller := monitor.NewPoller("configs/targets.json", 1*time.Second)
+	poller.RunPoller(ctx)
 
 	select {}
 }

@@ -67,9 +67,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 	}
 
 	w.tokens <- struct{}{}
-	fmt.Println("Acquiring a token")
 	defer func() {
-		fmt.Println("Giving up a token")
 		<-w.tokens
 	}()
 	start := time.Now()
