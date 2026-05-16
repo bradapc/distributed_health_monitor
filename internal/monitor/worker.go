@@ -29,6 +29,8 @@ type Worker struct {
 	CurrentState State
 	FailureCount int
 	LastFailure  time.Time
+
+	tokens chan struct{}
 }
 
 func (w *Worker) RunWorker(ctx context.Context) {
@@ -64,6 +66,12 @@ func (w *Worker) performCheck(ctx context.Context) {
 		return
 	}
 
+	w.tokens <- struct{}{}
+	fmt.Println("Acquiring a token")
+	defer func() {
+		fmt.Println("Giving up a token")
+		<-w.tokens
+	}()
 	start := time.Now()
 	resp, err := w.Client.Do(req)
 	latency := time.Since(start)
