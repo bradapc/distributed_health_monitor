@@ -2,21 +2,29 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 )
+
+var syntaxErr *json.SyntaxError
 
 type FilePoller struct {
 	filename         string
 	lastModifiedTime time.Time
 	pollTime         time.Duration
+	d                *Dispatcher
 }
 
-func NewPoller(filename string, pollTime time.Duration) *FilePoller {
+func NewPoller(filename string, pollTime time.Duration, d *Dispatcher) *FilePoller {
 	return &FilePoller{
 		filename: filename,
 		pollTime: pollTime,
+		d:        d,
 	}
 }
 
@@ -39,7 +47,12 @@ func (fp *FilePoller) RunPoller(ctx context.Context) error {
 				fmt.Println(err.Error())
 			}
 			if changed {
-				fp.hotReload()
+				err := fp.hotReload(ctx)
+				if err != nil && errors.As(err, &syntaxErr) {
+					fmt.Printf("WARNING: hot reload failed, check %s for syntax errors\n", fp.filename)
+				} else if err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
 	}
@@ -57,7 +70,14 @@ func (fp *FilePoller) PollFile(filename string) (bool, error) {
 	return false, nil
 }
 
-func (fp *FilePoller) hotReload() error {
-	fmt.Println("Detected refresh")
+func (fp *FilePoller) hotReload(ctx context.Context) error {
+	newTargets, err := config.LoadTargets(fp.filename)
+	if err != nil {
+		return fmt.Errorf("error loading new targets from hot refresh: %w", err)
+	}
+	err = fp.d.ReloadTargets(newTargets, ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -26,7 +26,7 @@ func main() {
 		dispatcher.StartWorker(ctx, t)
 	}
 
-	poller := monitor.NewPoller("configs/targets.json", 1*time.Second)
+	poller := monitor.NewPoller("configs/targets.json", 1*time.Second, dispatcher)
 	poller.RunPoller(ctx)
 
 	select {}
