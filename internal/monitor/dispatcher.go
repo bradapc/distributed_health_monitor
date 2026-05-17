@@ -12,9 +12,7 @@ import (
 //Manage pool of workers and config diffing
 
 /*
-	Dispatcher represents an object that handles creation and management of Worker structs
-
-mu is a mutex used to force cache writes to RAM before created threads can read config values
+Dispatcher represents an object that handles creation and management of Worker structs
 */
 type Dispatcher struct {
 	cancelWorkers map[string]context.CancelFunc
@@ -23,7 +21,7 @@ type Dispatcher struct {
 	client        *http.Client
 	targets       []config.MonitorTarget
 	tokens        chan struct{}
-	mu            sync.Mutex
+	mapMu         sync.Mutex
 }
 
 const WorkerPoolLimit int = 50
@@ -46,13 +44,16 @@ creation of workers from the Dispatcher view.
 */
 func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarget) {
 	workerCtx, cancel := context.WithCancel(ctx)
-	d.cancelWorkers[target.URL] = cancel
 	worker := Worker{
 		Target: target,
 		Client: d.client,
 		tokens: d.tokens,
 	}
+
+	d.mapMu.Lock()
+	d.cancelWorkers[target.URL] = cancel
 	d.activeWorkers[target.URL] = &worker
+	d.mapMu.Unlock()
 
 	d.wg.Add(1)
 	go func() {
@@ -62,9 +63,8 @@ func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarge
 }
 
 func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx context.Context) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
 
+	d.mapMu.Lock()
 	addedTargets, removedTargetUrls := d.diffTargets(newTargets)
 
 	for _, url := range removedTargetUrls {
@@ -72,6 +72,7 @@ func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx contex
 		delete(d.activeWorkers, url)
 	}
 
+	d.mapMu.Unlock()
 	for _, t := range addedTargets {
 		d.StartWorker(ctx, t)
 	}
