@@ -2,12 +2,12 @@ package monitor
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
+	"github.com/bradapc/distributed_health_monitor.git/internal/telemetry"
 )
 
 //Per-URL loop logic and state machine
@@ -37,7 +37,8 @@ type Worker struct {
 
 	tokens chan struct{}
 
-	logger *logger.Logger
+	logger  *logger.Logger
+	metrics *telemetry.TargetSummary
 }
 
 // Core work loop for a worker where health checks are performed at regular interval until termination
@@ -48,7 +49,6 @@ func (w *Worker) RunWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("Worker exiting gracefully ", w.Target.URL)
 			return
 		case <-ticker.C:
 			w.performCheck(ctx)
@@ -86,6 +86,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 	if err != nil {
 		w.logger.LogErrorFailure("worker_execution_error", latency, w.FailureCount+1, w.Target.URL, err.Error())
 		w.HandleFailure()
+		w.updateMetrics(latency, true)
 		return
 	}
 	defer resp.Body.Close()
@@ -93,6 +94,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
 		w.logger.LogNonErrorFailure("worker_execution_failed", resp.StatusCode, latency, w.FailureCount+1, w.Target.URL)
 		w.HandleFailure()
+		w.updateMetrics(latency, true)
 		return
 	}
 
@@ -101,7 +103,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 	}
 
 	w.FailureCount = 0
-
+	w.updateMetrics(latency, false)
 	w.logger.LogMessage("target_check_success", resp.StatusCode, latency, w.Target.URL)
 }
 
@@ -114,4 +116,17 @@ func (w *Worker) HandleFailure() {
 		w.CurrentState = Open
 	}
 	w.LastFailure = time.Now()
+}
+
+func (w *Worker) updateMetrics(latency int64, isError bool) {
+	w.metrics.Mu.Lock()
+	defer w.metrics.Mu.Unlock()
+	w.metrics.State = int(w.CurrentState)
+	w.metrics.FailureCount = w.FailureCount
+	w.metrics.LastChecked = time.Now()
+	w.metrics.LastCheckLatency = latency
+	w.metrics.TimesChecked++
+	if isError {
+		w.metrics.TimesErrored++
+	}
 }

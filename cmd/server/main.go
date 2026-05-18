@@ -12,6 +12,7 @@ import (
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
 	"github.com/bradapc/distributed_health_monitor.git/internal/monitor"
+	"github.com/bradapc/distributed_health_monitor.git/internal/telemetry"
 )
 
 func main() {
@@ -30,7 +31,7 @@ func main() {
 	}
 	defer cleanup()
 
-	dispatcher := monitor.NewDispatcher(targets, logger)
+	dispatcher := monitor.NewDispatcher(targets, logger, telemetry.NewMetricsRegistry())
 	ctx := context.Background()
 
 	for _, t := range targets {
@@ -52,6 +53,5 @@ func main() {
 
 /*
 Suggestions to Add:
-Clean exit
 Status tracking via api (current active workers, total network errors, token pool, responce latency data)
 */

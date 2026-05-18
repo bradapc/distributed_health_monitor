@@ -9,6 +9,7 @@ import (
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/httpclient"
 	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
+	"github.com/bradapc/distributed_health_monitor.git/internal/telemetry"
 )
 
 //Manage pool of workers and config diffing
@@ -26,20 +27,22 @@ type Dispatcher struct {
 	tokens chan struct{}
 	mapMu  sync.Mutex
 
-	logger *logger.Logger
+	logger          *logger.Logger
+	MetricsRegistry *telemetry.MetricsRegistry
 }
 
 const WorkerPoolLimit int = 50
 
 // Creates a new dispatcher with the specified slice of targets to monitor
-func NewDispatcher(targets []config.MonitorTarget, logger *logger.Logger) *Dispatcher {
+func NewDispatcher(targets []config.MonitorTarget, logger *logger.Logger, MetricsRegistry *telemetry.MetricsRegistry) *Dispatcher {
 	return &Dispatcher{
-		cancelWorkers: make(map[string]context.CancelFunc),
-		activeWorkers: make(map[string]*Worker),
-		targets:       targets,
-		client:        httpclient.NewHTTPClient(),
-		tokens:        make(chan struct{}, WorkerPoolLimit),
-		logger:        logger,
+		cancelWorkers:   make(map[string]context.CancelFunc),
+		activeWorkers:   make(map[string]*Worker),
+		targets:         targets,
+		client:          httpclient.NewHTTPClient(),
+		tokens:          make(chan struct{}, WorkerPoolLimit),
+		logger:          logger,
+		MetricsRegistry: MetricsRegistry,
 	}
 }
 
@@ -50,17 +53,21 @@ creation of workers from the Dispatcher view.
 */
 func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarget) {
 	workerCtx, cancel := context.WithCancel(ctx)
+	targetMetrics := d.MetricsRegistry.GetOrCreateBucket(target.URL)
 	worker := Worker{
-		Target: target,
-		Client: d.client,
-		tokens: d.tokens,
-		logger: d.logger,
+		Target:  target,
+		Client:  d.client,
+		tokens:  d.tokens,
+		logger:  d.logger,
+		metrics: targetMetrics,
 	}
 
 	d.mapMu.Lock()
 	d.cancelWorkers[target.URL] = cancel
 	d.activeWorkers[target.URL] = &worker
 	d.mapMu.Unlock()
+
+	d.MetricsRegistry.ConcurrencySummary.ActiveWorkers++
 
 	d.wg.Add(1)
 	go func() {
@@ -77,6 +84,8 @@ func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx contex
 	for _, url := range removedTargetUrls {
 		d.cancelWorkers[url]()
 		delete(d.activeWorkers, url)
+		d.MetricsRegistry.RemoveBucket(url)
+		d.MetricsRegistry.ConcurrencySummary.ActiveWorkers--
 	}
 
 	d.mapMu.Unlock()
