@@ -24,7 +24,7 @@ type Dispatcher struct {
 	client        *http.Client
 	targets       []config.MonitorTarget
 
-	tokens chan struct{}
+	Tokens chan struct{}
 	mapMu  sync.Mutex
 
 	logger          *logger.Logger
@@ -40,7 +40,7 @@ func NewDispatcher(targets []config.MonitorTarget, logger *logger.Logger, Metric
 		activeWorkers:   make(map[string]*Worker),
 		targets:         targets,
 		client:          httpclient.NewHTTPClient(),
-		tokens:          make(chan struct{}, WorkerPoolLimit),
+		Tokens:          make(chan struct{}, WorkerPoolLimit),
 		logger:          logger,
 		MetricsRegistry: MetricsRegistry,
 	}
@@ -57,7 +57,7 @@ func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarge
 	worker := Worker{
 		Target:  target,
 		Client:  d.client,
-		tokens:  d.tokens,
+		tokens:  d.Tokens,
 		logger:  d.logger,
 		metrics: targetMetrics,
 	}

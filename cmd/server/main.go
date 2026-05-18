@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/bradapc/distributed_health_monitor.git/internal/api"
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
 	"github.com/bradapc/distributed_health_monitor.git/internal/monitor"
@@ -31,8 +33,25 @@ func main() {
 	}
 	defer cleanup()
 
-	dispatcher := monitor.NewDispatcher(targets, logger, telemetry.NewMetricsRegistry())
+	metricsRegistry := telemetry.NewMetricsRegistry()
+	dispatcher := monitor.NewDispatcher(targets, logger, metricsRegistry)
 	ctx := context.Background()
+
+	apiServer := api.NewServer(metricsRegistry, dispatcher.Tokens)
+
+	go func() {
+		serverAddr := ":8080"
+		srv := &http.Server{
+			Addr:         serverAddr,
+			Handler:      apiServer.Routes(),
+			WriteTimeout: 5 * time.Second,
+			ReadTimeout:  5 * time.Second,
+		}
+		fmt.Printf("Starting telemetry API server on %s\n", serverAddr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("API server encountered error: %s", err)
+		}
+	}()
 
 	for _, t := range targets {
 		dispatcher.StartWorker(ctx, t)
