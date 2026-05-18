@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
@@ -21,10 +24,11 @@ func main() {
 		fmt.Printf("%d: %s\n", i, tar.URL)
 	}
 
-	logger, err := logger.NewLogger("log.jsonl")
+	logger, cleanup, err := logger.NewLogger("log.jsonl")
 	if err != nil {
 		log.Fatalf("fatal error in main: %s", err.Error())
 	}
+	defer cleanup()
 
 	dispatcher := monitor.NewDispatcher(targets, logger)
 	ctx := context.Background()
@@ -34,14 +38,20 @@ func main() {
 	}
 
 	poller := monitor.NewPoller("configs/targets.json", 1*time.Second, dispatcher)
-	poller.RunPoller(ctx)
+	go poller.RunPoller(ctx)
 
-	select {}
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	sig := <-sigChan
+
+	fmt.Printf("%s signal received, stopping workers...\n", sig.String())
+	dispatcher.Stop()
+
+	fmt.Println("System clean exit successful.")
 }
 
 /*
 Suggestions to Add:
-Logging to text file
 Clean exit
 Status tracking via api (current active workers, total network errors, token pool, responce latency data)
 */

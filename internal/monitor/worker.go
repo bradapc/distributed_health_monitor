@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -47,6 +48,7 @@ func (w *Worker) RunWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Println("Worker exiting gracefully ", w.Target.URL)
 			return
 		case <-ticker.C:
 			w.performCheck(ctx)

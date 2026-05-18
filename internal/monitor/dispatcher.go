@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -111,4 +112,12 @@ func (d *Dispatcher) diffTargets(newTargets []config.MonitorTarget) ([]config.Mo
 	}
 
 	return addedTargets, removedTargets
+}
+
+func (d *Dispatcher) Stop() {
+	for _, cancel := range d.cancelWorkers {
+		cancel()
+	}
+	d.wg.Wait()
+	fmt.Println("dispatcher stopped, all background workers cleaned up")
 }

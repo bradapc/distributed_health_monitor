@@ -27,14 +27,18 @@ type Logger struct {
 	logFilename *os.File
 }
 
-func NewLogger(logFilename string) (*Logger, error) {
+func NewLogger(logFilename string) (*Logger, func(), error) {
 	file, err := os.OpenFile(logFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing logger: %w", err)
+		return nil, nil, fmt.Errorf("error initializing logger: %w", err)
+	}
+	cleanup := func() {
+		file.Sync()
+		file.Close()
 	}
 	return &Logger{
 		jsonLogger: slog.New(slog.NewJSONHandler(file, nil)),
-	}, nil
+	}, cleanup, nil
 }
 
 func (l *Logger) LogMessage(message string, statusCode int, latency int64, url string) {
