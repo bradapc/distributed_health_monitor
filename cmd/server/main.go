@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
+	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
 	"github.com/bradapc/distributed_health_monitor.git/internal/monitor"
 )
 
@@ -19,7 +20,13 @@ func main() {
 	for i, tar := range targets {
 		fmt.Printf("%d: %s\n", i, tar.URL)
 	}
-	dispatcher := monitor.NewDispatcher(targets)
+
+	logger, err := logger.NewLogger("log.jsonl")
+	if err != nil {
+		log.Fatalf("fatal error in main: %s", err.Error())
+	}
+
+	dispatcher := monitor.NewDispatcher(targets, logger)
 	ctx := context.Background()
 
 	for _, t := range targets {
@@ -31,3 +38,10 @@ func main() {
 
 	select {}
 }
+
+/*
+Suggestions to Add:
+Logging to text file
+Clean exit
+Status tracking via api (current active workers, total network errors, token pool, responce latency data)
+*/

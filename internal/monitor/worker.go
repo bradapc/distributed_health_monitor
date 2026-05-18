@@ -2,11 +2,11 @@ package monitor
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
+	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
 )
 
 //Per-URL loop logic and state machine
@@ -19,9 +19,13 @@ const (
 	Closed
 )
 
+// Number of failure attempts before cooling down
 const FailureThreshold int = 3
+
+// Cooldown time after FailureThreshold attempts are reached
 const TimeoutThreshold int = 60
 
+// Worker monitors a URL target's health and tracks failures
 type Worker struct {
 	Target config.MonitorTarget
 	Client *http.Client
@@ -31,8 +35,11 @@ type Worker struct {
 	LastFailure  time.Time
 
 	tokens chan struct{}
+
+	logger *logger.Logger
 }
 
+// Core work loop for a worker where health checks are performed at regular interval until termination
 func (w *Worker) RunWorker(ctx context.Context) {
 	ticker := time.NewTicker(w.Target.Interval)
 	w.CurrentState = Closed
@@ -47,11 +54,11 @@ func (w *Worker) RunWorker(ctx context.Context) {
 	}
 }
 
+// Creates and fires the http request to monitor a URL
 func (w *Worker) performCheck(ctx context.Context) {
 	if w.CurrentState == Open {
 		timeElapsed := time.Since(w.LastFailure)
 		if timeElapsed.Seconds() >= float64(TimeoutThreshold) {
-			fmt.Printf("%s cooldown finished, retrying...\n", w.Target.URL)
 			w.CurrentState = HalfOpen
 		} else {
 			return
@@ -72,17 +79,17 @@ func (w *Worker) performCheck(ctx context.Context) {
 	}()
 	start := time.Now()
 	resp, err := w.Client.Do(req)
-	latency := time.Since(start)
+	latency := time.Since(start).Milliseconds()
 
 	if err != nil {
-		fmt.Printf("LOG: \t   \t%s\tFAILURE %d\t[%s]\n\tERROR\t%s\n", latency, w.FailureCount+1, w.Target.URL, err.Error())
+		w.logger.LogErrorFailure("worker_execution_error", latency, w.FailureCount+1, w.Target.URL, err.Error())
 		w.HandleFailure()
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
-		fmt.Printf("LOG: \t%d\t%s\tFAILURE %d\t[%s]\n", resp.StatusCode, latency, w.FailureCount+1, w.Target.URL)
+		w.logger.LogNonErrorFailure("worker_execution_failed", resp.StatusCode, latency, w.FailureCount+1, w.Target.URL)
 		w.HandleFailure()
 		return
 	}
@@ -93,11 +100,10 @@ func (w *Worker) performCheck(ctx context.Context) {
 
 	w.FailureCount = 0
 
-	fmt.Printf("LOG: \t%d\t%s\tHEALTHY\t[%s]\n", resp.StatusCode, latency, w.Target.URL)
-
-	//LogResult(resp.StatusCode, latency)
+	w.logger.LogMessage("target_check_success", resp.StatusCode, latency, w.Target.URL)
 }
 
+// Finite state machine for handling failure depending on stage in the FSM
 func (w *Worker) HandleFailure() {
 	w.FailureCount++
 	if w.CurrentState == HalfOpen {

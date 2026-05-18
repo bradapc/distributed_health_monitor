@@ -7,6 +7,7 @@ import (
 
 	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/httpclient"
+	"github.com/bradapc/distributed_health_monitor.git/internal/logger"
 )
 
 //Manage pool of workers and config diffing
@@ -20,20 +21,24 @@ type Dispatcher struct {
 	wg            sync.WaitGroup
 	client        *http.Client
 	targets       []config.MonitorTarget
-	tokens        chan struct{}
-	mapMu         sync.Mutex
+
+	tokens chan struct{}
+	mapMu  sync.Mutex
+
+	logger *logger.Logger
 }
 
 const WorkerPoolLimit int = 50
 
 // Creates a new dispatcher with the specified slice of targets to monitor
-func NewDispatcher(targets []config.MonitorTarget) *Dispatcher {
+func NewDispatcher(targets []config.MonitorTarget, logger *logger.Logger) *Dispatcher {
 	return &Dispatcher{
 		cancelWorkers: make(map[string]context.CancelFunc),
 		activeWorkers: make(map[string]*Worker),
 		targets:       targets,
 		client:        httpclient.NewHTTPClient(),
 		tokens:        make(chan struct{}, WorkerPoolLimit),
+		logger:        logger,
 	}
 }
 
@@ -48,6 +53,7 @@ func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarge
 		Target: target,
 		Client: d.client,
 		tokens: d.tokens,
+		logger: d.logger,
 	}
 
 	d.mapMu.Lock()
