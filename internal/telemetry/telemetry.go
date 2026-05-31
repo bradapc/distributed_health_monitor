@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"math"
 	"sync"
 	"time"
 )
@@ -32,6 +33,7 @@ type TargetSummary struct {
 	LastChecked      time.Time `json:"last_checked"`
 	TimesChecked     int       `json:"times_checked"`
 	TimesErrored     int       `json:"times_errored"`
+	PercentSuccess   float64   `json:"percent_success"`
 }
 
 type MetricsRegistry struct {
@@ -83,7 +85,14 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 			LastChecked:      bucket.LastChecked,
 			TimesChecked:     bucket.TimesChecked,
 			TimesErrored:     bucket.TimesErrored,
+			PercentSuccess: func() float64 {
+				if bucket.TimesChecked > 0 {
+					return 100 * math.Floor(float64((bucket.TimesChecked-bucket.TimesErrored))/float64(bucket.TimesChecked))
+				}
+				return 100
+			}(),
 		}
+
 		bucket.Mu.RUnlock()
 
 		agg.TotalChecks += snapshot[url].TimesChecked
