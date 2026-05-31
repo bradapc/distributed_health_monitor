@@ -37,10 +37,11 @@ type TargetSummary struct {
 }
 
 type TargetEvent struct {
-	URL          string `json:"affected_url"`
-	OldState     int    `json:"old_state"`
-	NewState     int    `json:"new_state"`
-	NetworkError string `json:"network_error"`
+	URL          string    `json:"affected_url"`
+	OldState     int       `json:"old_state"`
+	NewState     int       `json:"new_state"`
+	NetworkError string    `json:"network_error"`
+	FailureTime  time.Time `json:"failure_time"`
 }
 
 type EventLog []TargetEvent

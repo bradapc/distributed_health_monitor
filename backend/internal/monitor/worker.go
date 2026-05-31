@@ -118,13 +118,14 @@ func (w *Worker) HandleFailure(err string) {
 	} else if w.FailureCount == FailureThreshold {
 		w.CurrentState = Open
 	}
+	w.LastFailure = time.Now()
 	w.recordEvent(telemetry.TargetEvent{
 		URL:          w.Target.URL,
 		OldState:     int(oldState),
 		NewState:     int(w.CurrentState),
 		NetworkError: err,
+		FailureTime:  w.LastFailure,
 	})
-	w.LastFailure = time.Now()
 }
 
 func (w *Worker) updateMetrics(latency int64, isError bool) {

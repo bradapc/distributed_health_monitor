@@ -18,5 +18,10 @@
     "url": "https://httpbin.org/status/500",
     "interval": "20s",
     "timeout": "2s"
+  },
+  {
+    "url": "https://www.reddit.com/",
+    "interval": "5s",
+    "timeout": "2s"
   }
 ]

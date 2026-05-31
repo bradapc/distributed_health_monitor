@@ -13,7 +13,7 @@ interface AggregateSummary {
 }
 
 interface TargetSummary {
-  state: number
+  state: number // 0 = OPEN, 1 = HALF-OPEN, 2 = CLOSED
   failure_count: number
   last_check_latency_ms: number
   last_checked: string
@@ -27,6 +27,7 @@ interface TargetEvent {
   old_state: number
   new_state: number
   network_error: string
+  failure_time: number
 }
 
 interface TelemetryPayload {
@@ -46,7 +47,7 @@ function App() {
   const [configStatus, setConfigStatus] = useState<string>('')
 
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:8080/api/stream')
+    const eventSource = new EventSource('http://localhost:8080/stream')
 
     eventSource.onmessage = (event) => {
       try {
@@ -58,7 +59,8 @@ function App() {
       }
     }
 
-    eventSource.onerror = () => {
+    eventSource.onerror = (event) => {
+      console.log(event)
       setConnectionError("Telemetry stream disconnected. Attempting automatic reconnection...")
     }
 
@@ -105,9 +107,15 @@ function App() {
   }
 
   const getStatusDetails = (stateNum: number) => {
-    return stateNum === 0 
-      ? { text: 'CLOSED (Healthy)', className: 'status-badge success-bg' } 
-      : { text: 'OPEN (Tripped)', className: 'status-badge danger-bg' }
+    switch (stateNum) {
+      case 0:
+        return { text: 'OPEN (Tripped)', className: 'status-badge danger-bg', color: 'var(--danger)' }
+      case 1:
+        return { text: 'HALF-OPEN (Testing)', className: 'status-badge warning-bg', color: '#ffc107' }
+      case 2:
+      default:
+        return { text: 'CLOSED (HEALTHY)', className: 'status-badge success-bg', color: 'var(--success)' }
+    }
   }
 
   return (
@@ -181,11 +189,13 @@ function App() {
             <div className="targets-grid">
               {Object.entries(data.targets).map(([url, target]) => {
                 const badge = getStatusDetails(target.state)
+                const cardClass = target.state === 0 ? 'target-card tripped' : target.state === 1 ? 'target-card half-tripped' : 'target-card'
+                
                 return (
-                  <div key={url} className={`target-card ${target.state === 1 ? 'tripped' : ''}`}>
+                  <div key={url} className={cardClass}>
                     <div>
                       <div className="target-card-header">
-                        <span className={badge.className} style={{ backgroundColor: target.state === 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        <span className={badge.className} style={{ backgroundColor: badge.color, color: target.state === 1 ? '#000' : '#fff' }}>
                           {badge.text}
                         </span>
                         <span className="success-rate">{target.percent_success.toFixed(0)}% success</span>
@@ -214,10 +224,14 @@ function App() {
               {data.event_log && data.event_log.length > 0 ? (
                 [...data.event_log].reverse().map((event, idx) => {
                   if (!event.affected_url) return null
-                  const isFailure = event.new_state === 1
+                  
+                  let rowStyleClass = 'audit-log-row healthy'
+                  if (event.new_state === 0) rowStyleClass = 'audit-log-row failure'
+                  if (event.new_state === 1) rowStyleClass = 'audit-log-row warning'
+
                   return (
-                    <div key={idx} className={`audit-log-row ${isFailure ? 'failure' : 'healthy'}`}>
-                      <span className="audit-log-timestamp">[{new Date().toLocaleTimeString()}]</span>
+                    <div key={idx} className={rowStyleClass}>
+                      <span className="audit-log-timestamp">[{event.failure_time}]</span>
                       <strong>{event.affected_url}</strong> transitioned from {getStatusDetails(event.old_state).text} to <strong style={{ textDecoration: 'underline' }}>{getStatusDetails(event.new_state).text}</strong>
                       {event.network_error && <div className="audit-log-reason">↳ Reason: {event.network_error}</div>}
                     </div>
