@@ -55,11 +55,12 @@ func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarge
 	workerCtx, cancel := context.WithCancel(ctx)
 	targetMetrics := d.MetricsRegistry.GetOrCreateBucket(target.URL)
 	worker := Worker{
-		Target:  target,
-		Client:  d.client,
-		tokens:  d.Tokens,
-		logger:  d.logger,
-		metrics: targetMetrics,
+		Target:      target,
+		Client:      d.client,
+		tokens:      d.Tokens,
+		logger:      d.logger,
+		metrics:     targetMetrics,
+		recordEvent: d.MetricsRegistry.RecordEvent,
 	}
 
 	d.mapMu.Lock()

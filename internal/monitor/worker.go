@@ -39,6 +39,8 @@ type Worker struct {
 
 	logger  *logger.Logger
 	metrics *telemetry.TargetSummary
+
+	recordEvent func(telemetry.TargetEvent)
 }
 
 // Core work loop for a worker where health checks are performed at regular interval until termination
@@ -85,7 +87,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 
 	if err != nil {
 		w.logger.LogErrorFailure("worker_execution_error", latency, w.FailureCount+1, w.Target.URL, err.Error())
-		w.HandleFailure()
+		w.HandleFailure(err.Error())
 		w.updateMetrics(latency, true)
 		return
 	}
@@ -93,7 +95,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 
 	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
 		w.logger.LogNonErrorFailure("worker_execution_failed", resp.StatusCode, latency, w.FailureCount+1, w.Target.URL)
-		w.HandleFailure()
+		w.HandleFailure("Error: Network code within 500-600 range")
 		w.updateMetrics(latency, true)
 		return
 	}
@@ -108,13 +110,20 @@ func (w *Worker) performCheck(ctx context.Context) {
 }
 
 // Finite state machine for handling failure depending on stage in the FSM
-func (w *Worker) HandleFailure() {
+func (w *Worker) HandleFailure(err string) {
 	w.FailureCount++
+	oldState := w.CurrentState
 	if w.CurrentState == HalfOpen {
 		w.CurrentState = Open
 	} else if w.FailureCount == FailureThreshold {
 		w.CurrentState = Open
 	}
+	w.recordEvent(telemetry.TargetEvent{
+		URL:          w.Target.URL,
+		OldState:     int(oldState),
+		NewState:     int(w.CurrentState),
+		NetworkError: err,
+	})
 	w.LastFailure = time.Now()
 }
 

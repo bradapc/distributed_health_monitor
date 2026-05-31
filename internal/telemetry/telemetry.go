@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"math"
 	"sync"
 	"time"
 )
@@ -12,6 +11,7 @@ type Telemetry struct {
 	ConcurrencySummary ConcurrencySummary       `json:"concurrency"`
 	AggregateSummary   AggregateSummary         `json:"aggregate"`
 	Targets            map[string]TargetSummary `json:"targets"`
+	EventLog           EventLog                 `json:"event_log"`
 }
 
 type ConcurrencySummary struct {
@@ -36,17 +36,39 @@ type TargetSummary struct {
 	PercentSuccess   float64   `json:"percent_success"`
 }
 
+type TargetEvent struct {
+	URL          string `json:"affected_url"`
+	OldState     int    `json:"old_state"`
+	NewState     int    `json:"new_state"`
+	NetworkError string `json:"network_error"`
+}
+
+type EventLog []TargetEvent
+
 type MetricsRegistry struct {
 	mapMu              sync.RWMutex
 	Targets            map[string]*TargetSummary
 	ConcurrencySummary ConcurrencySummary
+
+	elMu     sync.RWMutex
+	EventLog EventLog
 }
 
 func NewMetricsRegistry() *MetricsRegistry {
 	return &MetricsRegistry{
 		Targets:            make(map[string]*TargetSummary),
 		ConcurrencySummary: ConcurrencySummary{},
+		EventLog:           make(EventLog, 0, 50),
 	}
+}
+
+func (r *MetricsRegistry) RecordEvent(te TargetEvent) {
+	r.elMu.Lock()
+	if len(r.EventLog) == 50 {
+		r.EventLog = r.EventLog[1:]
+	}
+	r.EventLog = append(r.EventLog, te)
+	r.elMu.Unlock()
 }
 
 func (r *MetricsRegistry) GetOrCreateBucket(url string) *TargetSummary {
@@ -87,7 +109,7 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 			TimesErrored:     bucket.TimesErrored,
 			PercentSuccess: func() float64 {
 				if bucket.TimesChecked > 0 {
-					return 100 * math.Floor(float64((bucket.TimesChecked-bucket.TimesErrored))/float64(bucket.TimesChecked))
+					return float64((bucket.TimesChecked-bucket.TimesErrored)*100) / float64(bucket.TimesChecked)
 				}
 				return 100
 			}(),
@@ -99,6 +121,11 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 		agg.TotalNetworkErrors += snapshot[url].TimesErrored
 	}
 
+	r.elMu.RLock()
+	eventsCopy := make(EventLog, len(r.EventLog))
+	copy(eventsCopy, r.EventLog)
+	r.elMu.RUnlock()
+
 	telemetry := &Telemetry{
 		Status: "active",
 		Uptime: -1,
@@ -109,6 +136,7 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 		},
 		AggregateSummary: agg,
 		Targets:          snapshot,
+		EventLog:         eventsCopy,
 	}
 	return telemetry
 }
