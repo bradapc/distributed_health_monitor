@@ -3,9 +3,11 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
+	"github.com/bradapc/distributed_health_monitor.git/internal/config"
 	"github.com/bradapc/distributed_health_monitor.git/internal/telemetry"
 )
 
@@ -28,7 +30,23 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /metrics", s.handleMetrics)
 	mux.HandleFunc("GET /stream", s.handleEventStream)
 	mux.HandleFunc("GET /config", s.handleGetConfig)
+	mux.HandleFunc("POST /config", s.handlePostConfig)
 	return enableCORS(mux)
+}
+
+func (s *Server) handlePostConfig(w http.ResponseWriter, r *http.Request) {
+	targetsPayload, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+	err = config.ReplaceFile(targetsPayload)
+	if err != nil {
+		http.Error(w, "Failed to replace targets", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {

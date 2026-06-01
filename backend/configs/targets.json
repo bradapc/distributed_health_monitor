@@ -23,5 +23,10 @@
     "url": "https://www.reddit.com/",
     "interval": "5s",
     "timeout": "2s"
-  }
+  },
+{
+"url": "https://github.com/",
+"interval": "8s",
+"timeout": "2s"
+}
 ]

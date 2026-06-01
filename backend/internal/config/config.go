@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,32 @@ type MonitorTarget struct {
 	URL      string
 	Interval time.Duration
 	Timeout  time.Duration
+}
+
+var tempTargetMutex sync.Mutex
+
+func ReplaceFile(targetsPayload []byte) error {
+	tempTargetMutex.Lock()
+	defer tempTargetMutex.Unlock()
+	file, err := os.OpenFile("configs/targets.tmp", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(targetsPayload)
+	if err != nil {
+		return err
+	}
+	err = file.Sync()
+	if err != nil {
+		return err
+	}
+	file.Close()
+	err = os.Rename("configs/targets.tmp", "configs/targets.json")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	return nil
 }
 
 func LoadTargets(filename string) ([]MonitorTarget, error) {
