@@ -27,7 +27,13 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /metrics", s.handleMetrics)
 	mux.HandleFunc("GET /stream", s.handleEventStream)
+	mux.HandleFunc("GET /config", s.handleGetConfig)
 	return enableCORS(mux)
+}
+
+func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	http.ServeFile(w, r, "configs/targets.json")
 }
 
 func (s *Server) handleEventStream(w http.ResponseWriter, r *http.Request) {

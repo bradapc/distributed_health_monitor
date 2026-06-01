@@ -71,7 +71,7 @@ function App() {
 
   const fetchCurrentConfig = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/config')
+      const res = await fetch('http://localhost:8080/config')
       if (res.ok) {
         const rawJson = await res.text()
         const formatted = JSON.stringify(JSON.parse(rawJson), null, 2)
@@ -88,7 +88,7 @@ function App() {
     try {
       JSON.parse(configText)
 
-      const res = await fetch('http://localhost:8080/api/config', {
+      const res = await fetch('http://localhost:8080/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: configText
@@ -231,7 +231,7 @@ function App() {
 
                   return (
                     <div key={idx} className={rowStyleClass}>
-                      <span className="audit-log-timestamp">[{event.failure_time}]</span>
+                      <span className="audit-log-timestamp">[{event.failure_time?.toString().split('.')[0].replace('T', ' ')}]</span>
                       <strong>{event.affected_url}</strong> transitioned from {getStatusDetails(event.old_state).text} to <strong style={{ textDecoration: 'underline' }}>{getStatusDetails(event.new_state).text}</strong>
                       {event.network_error && <div className="audit-log-reason">↳ Reason: {event.network_error}</div>}
                     </div>
