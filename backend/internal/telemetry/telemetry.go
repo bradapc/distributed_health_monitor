@@ -55,6 +55,7 @@ type MetricsRegistry struct {
 	EventLog EventLog
 }
 
+// NewMetricsRegistry creates a metrics registry
 func NewMetricsRegistry() *MetricsRegistry {
 	return &MetricsRegistry{
 		Targets:            make(map[string]*TargetSummary),
@@ -63,6 +64,7 @@ func NewMetricsRegistry() *MetricsRegistry {
 	}
 }
 
+// RecordEvent atomically adds an event to the event log, removing the oldest event if it is full
 func (r *MetricsRegistry) RecordEvent(te TargetEvent) {
 	r.elMu.Lock()
 	if len(r.EventLog) == 50 {
@@ -72,6 +74,7 @@ func (r *MetricsRegistry) RecordEvent(te TargetEvent) {
 	r.elMu.Unlock()
 }
 
+// GetOrCreateBucket atomically creates or returns a TargetSummary for metrics gathering for a specified target
 func (r *MetricsRegistry) GetOrCreateBucket(url string) *TargetSummary {
 	r.mapMu.Lock()
 	defer r.mapMu.Unlock()
@@ -85,12 +88,14 @@ func (r *MetricsRegistry) GetOrCreateBucket(url string) *TargetSummary {
 	return newBucket
 }
 
+// RemoveBucket atomically deletes a TargetSummary for when a target is no longer actively monitored
 func (r *MetricsRegistry) RemoveBucket(url string) {
 	r.mapMu.Lock()
 	defer r.mapMu.Unlock()
 	delete(r.Targets, url)
 }
 
+// GetSnapshot returns a snapshot of the current system state for all targets monitored
 func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 	r.mapMu.RLock()
 	defer r.mapMu.RUnlock()

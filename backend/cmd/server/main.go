@@ -69,8 +69,3 @@ func main() {
 
 	fmt.Println("System clean exit successful.")
 }
-
-/*
-Suggestions to Add:
-Status tracking via api (current active workers, total network errors, token pool, responce latency data)
-*/

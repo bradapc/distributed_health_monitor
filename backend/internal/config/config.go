@@ -24,6 +24,7 @@ type MonitorTarget struct {
 
 var tempTargetMutex sync.Mutex
 
+// ReplaceFile atomically streams the user payload of a target json file change to a tmp file then atomically renames it to targets.json, allowing the hot reloader to parse changes
 func ReplaceFile(targetsPayload []byte) error {
 	tempTargetMutex.Lock()
 	defer tempTargetMutex.Unlock()
@@ -48,6 +49,7 @@ func ReplaceFile(targetsPayload []byte) error {
 	return nil
 }
 
+// LoadTargets reads a filepath and converts the raw json to a slice of targets endpoints to be monitored
 func LoadTargets(filename string) ([]MonitorTarget, error) {
 	dataTargets, err := os.ReadFile(filename)
 	if err != nil {
@@ -69,6 +71,7 @@ func LoadTargets(filename string) ([]MonitorTarget, error) {
 	return convertedTargets, nil
 }
 
+// validateTarget reads a rawTarget from json, ensures it is an existing url with valid intervals, and converts it to a MonitorTarget
 func validateTarget(target rawTarget) (MonitorTarget, error) {
 	if target.URL == "" {
 		return MonitorTarget{}, fmt.Errorf("invalid url on target: %s", target.URL)

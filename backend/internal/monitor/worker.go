@@ -58,7 +58,7 @@ func (w *Worker) RunWorker(ctx context.Context) {
 	}
 }
 
-// Creates and fires the http request to monitor a URL
+// performCheck creates and fires the http request to monitor a URL
 func (w *Worker) performCheck(ctx context.Context) {
 	if w.CurrentState == Open {
 		timeElapsed := time.Since(w.LastFailure)
@@ -109,7 +109,7 @@ func (w *Worker) performCheck(ctx context.Context) {
 	w.logger.LogMessage("target_check_success", resp.StatusCode, latency, w.Target.URL)
 }
 
-// Finite state machine for handling failure depending on stage in the FSM
+// HandleFailure handles the finite state machine depending on the stage in the FSM. It also calls to record the failure event.
 func (w *Worker) HandleFailure(err string) {
 	w.FailureCount++
 	oldState := w.CurrentState
@@ -128,6 +128,8 @@ func (w *Worker) HandleFailure(err string) {
 	})
 }
 
+// UpdateMetrics atomically updates a worker's target metrics.
+// Updates: state, failure count, last checked, latency, times checked
 func (w *Worker) updateMetrics(latency int64, isError bool) {
 	w.metrics.Mu.Lock()
 	defer w.metrics.Mu.Unlock()

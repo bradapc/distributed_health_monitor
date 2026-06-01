@@ -77,6 +77,7 @@ func (d *Dispatcher) StartWorker(ctx context.Context, target config.MonitorTarge
 	}()
 }
 
+// ReloadTargets atomically determines targets added or removed from the target json file and updates the target map by adding and removing targets as necessary, starting new workers and removing old ones.
 func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx context.Context) error {
 
 	d.mapMu.Lock()
@@ -96,6 +97,7 @@ func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx contex
 	return nil
 }
 
+// diffTargets compares the old targets to the new targets and returns slices corresponding to what has been added and what has been removed
 // TODO: Compare changes for interval and poll time instead of just URL
 func (d *Dispatcher) diffTargets(newTargets []config.MonitorTarget) ([]config.MonitorTarget, []string) {
 	addedTargets := make([]config.MonitorTarget, 0)
@@ -124,6 +126,7 @@ func (d *Dispatcher) diffTargets(newTargets []config.MonitorTarget) ([]config.Mo
 	return addedTargets, removedTargets
 }
 
+// Stop cancels all background workers when the application closes
 func (d *Dispatcher) Stop() {
 	for _, cancel := range d.cancelWorkers {
 		cancel()

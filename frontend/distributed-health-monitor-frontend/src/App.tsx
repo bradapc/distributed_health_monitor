@@ -109,12 +109,12 @@ function App() {
   const getStatusDetails = (stateNum: number) => {
     switch (stateNum) {
       case 0:
-        return { text: 'OPEN (Tripped)', className: 'status-badge danger-bg', color: 'var(--danger)' }
+        return { text: 'DOWN', className: 'status-badge danger-bg', color: 'var(--danger)' }
       case 1:
-        return { text: 'HALF-OPEN (Testing)', className: 'status-badge warning-bg', color: '#ffc107' }
+        return { text: 'TESTING', className: 'status-badge warning-bg', color: '#ffc107' }
       case 2:
       default:
-        return { text: 'CLOSED (HEALTHY)', className: 'status-badge success-bg', color: 'var(--success)' }
+        return { text: 'HEALTHY', className: 'status-badge success-bg', color: 'var(--success)' }
     }
   }
 
@@ -143,15 +143,15 @@ function App() {
             <div className="stat-card">
               <h3>Worker Pool Load</h3>
               <div className="stat-value">{data.concurrency.active_workers} / {data.concurrency.max_worker_limit}</div>
-              <p>{data.concurrency.available_tokens} tokens sitting in semaphore</p>
+              <p>{data.concurrency.available_tokens} free worker tokens</p>
             </div>
             <div className="stat-card">
-              <h3>Total Global Probes</h3>
+              <h3>Total Health Checks</h3>
               <div className="stat-value">{data.aggregate.total_checks_performed}</div>
-              <p>Requests performed lock-free</p>
+              <p>Requests performed</p>
             </div>
             <div className="stat-card">
-              <h3>Global Outages</h3>
+              <h3>Total Failed Checks</h3>
               <div className="stat-value error">{data.aggregate.total_network_errors}</div>
               <p>Network connection anomalies</p>
             </div>
@@ -171,7 +171,7 @@ function App() {
             {isEditing && (
               <div className="editor-wrapper">
                 <h3>Raw Configuration File Editor (`targets.json`)</h3>
-                <p>Modifying this content directly mimics opening your text editor locally. Saving triggers atomic system operations.</p>
+                <p>Modifying this content edits targets.json on the local machine. Add, remove, or edit targets.</p>
                 <textarea
                   className="editor-textarea"
                   value={configText}
@@ -206,8 +206,8 @@ function App() {
                     <div className="target-meta-metrics">
                       <div>Latency: <strong>{target.last_check_latency_ms}ms</strong></div>
                       <div>Cycles: <strong>{target.times_checked}</strong></div>
-                      <div>Failures Counter: <strong className={target.failure_count > 0 ? 'error-count' : ''}>{target.failure_count}</strong></div>
-                      <div>Total Errors: <strong>{target.times_errored}</strong></div>
+                      <div>Failures: <strong className={target.failure_count > 0 ? 'error-count' : ''}>{target.failure_count}</strong></div>
+                      <div>Errors: <strong>{target.times_errored}</strong></div>
                     </div>
                     <div className="target-card-footer">
                       Last probed: {target.last_checked ? new Date(target.last_checked).toLocaleTimeString() : 'Never'}

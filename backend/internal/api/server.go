@@ -17,6 +17,7 @@ type Server struct {
 	startTime time.Time
 }
 
+// NewServer creates a new api server with an associated MetricsRegistry
 func NewServer(reg *telemetry.MetricsRegistry, tokenChan chan struct{}) *Server {
 	return &Server{
 		registry:  reg,
@@ -25,6 +26,7 @@ func NewServer(reg *telemetry.MetricsRegistry, tokenChan chan struct{}) *Server 
 	}
 }
 
+// Routes returns a mux handling all server routes with CORS enabled
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /metrics", s.handleMetrics)
@@ -34,6 +36,7 @@ func (s *Server) Routes() http.Handler {
 	return enableCORS(mux)
 }
 
+// handlePostConfig handles the POST /config endpoint. It reads the request payload and delegates file replacement of the target json file with the request payload.
 func (s *Server) handlePostConfig(w http.ResponseWriter, r *http.Request) {
 	targetsPayload, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -49,11 +52,13 @@ func (s *Server) handlePostConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+// handleGetConfig handles GET /config which returns the contents of the target json file.
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	http.ServeFile(w, r, "configs/targets.json")
 }
 
+// handleEventStream handles GET /config which continuously streams snapshots of the system's current state to the user via SSE. The endpoint sends snapshots on a 1s interval.
 func (s *Server) handleEventStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache, no-transform")
@@ -101,6 +106,7 @@ func (s *Server) handleEventStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleMetrics handles GET /metrics which sends a snapshot via REST of the current system state
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	snapshot := s.getSnapshotPayload()
 
@@ -112,6 +118,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// getSnapshotPayload gets a snapshot of the system state and appends the uptime and system status
 func (s *Server) getSnapshotPayload() *telemetry.Telemetry {
 	snapshot := s.registry.GetSnapshot(s.tokenChan)
 	snapshot.Uptime = int(time.Since(s.startTime).Seconds())
@@ -123,6 +130,7 @@ func (s *Server) getSnapshotPayload() *telemetry.Telemetry {
 	return snapshot
 }
 
+// enableCORS middleware configures the http handler to accept requests from the frontend
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")

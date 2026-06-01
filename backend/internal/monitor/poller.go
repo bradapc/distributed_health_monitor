@@ -20,6 +20,7 @@ type FilePoller struct {
 	d                *Dispatcher
 }
 
+// NewPoller constructs and returns a Poller object that polls a file for changes at pollTime interval
 func NewPoller(filename string, pollTime time.Duration, d *Dispatcher) *FilePoller {
 	return &FilePoller{
 		filename: filename,
@@ -28,6 +29,7 @@ func NewPoller(filename string, pollTime time.Duration, d *Dispatcher) *FilePoll
 	}
 }
 
+// RunPoller initiates the core loop for a poller of initializing the last modified time and sending poll requests at a fixed interval. Calls PollFile for individual poll requests, and if a change is found, initiate a hot reload.
 func (fp *FilePoller) RunPoller(ctx context.Context) error {
 	fileInfo, err := os.Stat(fp.filename)
 	if err != nil {
@@ -58,6 +60,7 @@ func (fp *FilePoller) RunPoller(ctx context.Context) error {
 	}
 }
 
+// PollFile checks if a file has been modified. If so, it returns true to initiate a hot reload.
 func (fp *FilePoller) PollFile(filename string) (bool, error) {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
@@ -70,6 +73,7 @@ func (fp *FilePoller) PollFile(filename string) (bool, error) {
 	return false, nil
 }
 
+// hotReload loads the new targets from the updated json file and initiates a reload of the targets
 func (fp *FilePoller) hotReload(ctx context.Context) error {
 	newTargets, err := config.LoadTargets(fp.filename)
 	if err != nil {
