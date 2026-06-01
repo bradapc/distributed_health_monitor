@@ -101,7 +101,7 @@ func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx contex
 // TODO: Compare changes for interval and poll time instead of just URL
 func (d *Dispatcher) diffTargets(newTargets []config.MonitorTarget) ([]config.MonitorTarget, []string) {
 	addedTargets := make([]config.MonitorTarget, 0)
-	removedTargets := make([]string, 0)
+	removedTargetURLs := make([]string, 0)
 
 	newTargetsMap := make(map[string]config.MonitorTarget)
 
@@ -112,18 +112,22 @@ func (d *Dispatcher) diffTargets(newTargets []config.MonitorTarget) ([]config.Mo
 	for url := range d.activeWorkers {
 		_, ok := newTargetsMap[url]
 		if !ok {
-			removedTargets = append(removedTargets, url)
+			removedTargetURLs = append(removedTargetURLs, url)
 		}
+
 	}
 
-	for url, mt := range newTargetsMap {
-		_, ok := d.activeWorkers[url]
+	for url, monitorTarget := range newTargetsMap {
+		activeWorker, ok := d.activeWorkers[url]
 		if !ok {
-			addedTargets = append(addedTargets, mt)
+			addedTargets = append(addedTargets, monitorTarget)
+		} else if monitorTarget.Interval != activeWorker.Target.Interval || monitorTarget.Timeout != activeWorker.Target.Timeout {
+			addedTargets = append(addedTargets, monitorTarget)
+			removedTargetURLs = append(removedTargetURLs, activeWorker.Target.URL)
 		}
 	}
 
-	return addedTargets, removedTargets
+	return addedTargets, removedTargetURLs
 }
 
 // Stop cancels all background workers when the application closes
