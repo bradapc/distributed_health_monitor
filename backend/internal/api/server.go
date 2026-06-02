@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +34,24 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /stream", s.handleEventStream)
 	mux.HandleFunc("GET /config", s.handleGetConfig)
 	mux.HandleFunc("POST /config", s.handlePostConfig)
+	mux.HandleFunc("GET /targets/{id}", s.handleGetTargetEvents)
 	return enableCORS(mux)
+}
+
+func (s *Server) handleGetTargetEvents(w http.ResponseWriter, r *http.Request) {
+	targetBase64 := r.PathValue("id")
+	targetUrlBytes, err := base64.StdEncoding.DecodeString(targetBase64)
+	if err != nil {
+		http.Error(w, "error decoding target url", http.StatusBadRequest)
+		return
+	}
+	targetUrlStr := string(targetUrlBytes)
+	payload := s.registry.GetTargetEventSummary(targetUrlStr)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		http.Error(w, "error encoding target event summary", http.StatusInternalServerError)
+		return
+	}
 }
 
 // handlePostConfig handles the POST /config endpoint. It reads the request payload and delegates file replacement of the target json file with the request payload.

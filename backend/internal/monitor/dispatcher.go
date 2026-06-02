@@ -98,7 +98,6 @@ func (d *Dispatcher) ReloadTargets(newTargets []config.MonitorTarget, ctx contex
 }
 
 // diffTargets compares the old targets to the new targets and returns slices corresponding to what has been added and what has been removed
-// TODO: Compare changes for interval and poll time instead of just URL
 func (d *Dispatcher) diffTargets(newTargets []config.MonitorTarget) ([]config.MonitorTarget, []string) {
 	addedTargets := make([]config.MonitorTarget, 0)
 	removedTargetURLs := make([]string, 0)

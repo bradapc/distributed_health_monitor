@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { TargetDetailModal } from './TargetDetailModal'
 
 interface ConcurrencySummary {
   active_workers: number
@@ -44,6 +45,7 @@ function App() {
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [configText, setConfigText] = useState<string>('{\n  "targets": []\n}')
   const [isEditing, setIsEditing] = useState<boolean>(false)
+  const [selectedTargetUrl, setSelectedTargetUrl] = useState<string | null>(null)
   const [configStatus, setConfigStatus] = useState<string>('')
 
   useEffect(() => {
@@ -192,7 +194,12 @@ function App() {
                 const cardClass = target.state === 0 ? 'target-card tripped' : target.state === 1 ? 'target-card half-tripped' : 'target-card'
                 
                 return (
-                  <div key={url} className={cardClass}>
+                  <div 
+                    key={url} 
+                    className={`${cardClass} interactive-clickable-node`}
+                    onClick={() => setSelectedTargetUrl(url)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <div>
                       <div className="target-card-header">
                         <span className={badge.className} style={{ backgroundColor: badge.color, color: target.state === 1 ? '#000' : '#fff' }}>
@@ -250,6 +257,13 @@ function App() {
           <h2>Establishing pipe communication channel...</h2>
           <p>Polling stream endpoint allocations at port 8080</p>
         </div>
+      )}
+      {selectedTargetUrl && (
+        <TargetDetailModal
+          url={selectedTargetUrl}
+          onClose={() => setSelectedTargetUrl(null)}
+          getStatusDetails={getStatusDetails}
+        />
       )}
     </div>
   )

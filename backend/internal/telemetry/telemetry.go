@@ -11,7 +11,7 @@ type Telemetry struct {
 	ConcurrencySummary ConcurrencySummary       `json:"concurrency"`
 	AggregateSummary   AggregateSummary         `json:"aggregate"`
 	Targets            map[string]TargetSummary `json:"targets"`
-	EventLog           EventLog                 `json:"event_log"`
+	RecentEventLog     RecentEventLog           `json:"event_log"`
 }
 
 type ConcurrencySummary struct {
@@ -44,15 +44,18 @@ type TargetEvent struct {
 	FailureTime  time.Time `json:"failure_time"`
 }
 
-type EventLog []TargetEvent
+type RecentEventLog []TargetEvent
 
 type MetricsRegistry struct {
 	mapMu              sync.RWMutex
 	Targets            map[string]*TargetSummary
 	ConcurrencySummary ConcurrencySummary
 
-	elMu     sync.RWMutex
-	EventLog EventLog
+	elMu           sync.RWMutex
+	RecentEventLog RecentEventLog
+
+	telMu          sync.RWMutex
+	TargetEventLog map[string][]TargetEvent
 }
 
 // NewMetricsRegistry creates a metrics registry
@@ -60,18 +63,33 @@ func NewMetricsRegistry() *MetricsRegistry {
 	return &MetricsRegistry{
 		Targets:            make(map[string]*TargetSummary),
 		ConcurrencySummary: ConcurrencySummary{},
-		EventLog:           make(EventLog, 0, 50),
+		RecentEventLog:     make(RecentEventLog, 0, 50),
+		TargetEventLog:     make(map[string][]TargetEvent),
 	}
 }
 
+func (r *MetricsRegistry) GetTargetEventSummary(url string) []TargetEvent {
+	r.telMu.RLock()
+	defer r.telMu.RUnlock()
+	return r.TargetEventLog[url]
+}
+
 // RecordEvent atomically adds an event to the event log, removing the oldest event if it is full
+// Also adds the event to a url specific bucket
 func (r *MetricsRegistry) RecordEvent(te TargetEvent) {
 	r.elMu.Lock()
-	if len(r.EventLog) == 50 {
-		r.EventLog = r.EventLog[1:]
+	if len(r.RecentEventLog) == 50 {
+		r.RecentEventLog = r.RecentEventLog[1:]
 	}
-	r.EventLog = append(r.EventLog, te)
+	r.RecentEventLog = append(r.RecentEventLog, te)
 	r.elMu.Unlock()
+	r.telMu.Lock()
+	defer r.telMu.Unlock()
+	eventBucket, ok := r.TargetEventLog[te.URL]
+	if !ok {
+		r.TargetEventLog[te.URL] = make([]TargetEvent, 0, 10)
+	}
+	r.TargetEventLog[te.URL] = append(eventBucket, te)
 }
 
 // GetOrCreateBucket atomically creates or returns a TargetSummary for metrics gathering for a specified target
@@ -117,7 +135,7 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 				if bucket.TimesChecked > 0 {
 					return float64((bucket.TimesChecked-bucket.TimesErrored)*100) / float64(bucket.TimesChecked)
 				}
-				return 100
+				return 0
 			}(),
 		}
 
@@ -128,8 +146,8 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 	}
 
 	r.elMu.RLock()
-	eventsCopy := make(EventLog, len(r.EventLog))
-	copy(eventsCopy, r.EventLog)
+	eventsCopy := make(RecentEventLog, len(r.RecentEventLog))
+	copy(eventsCopy, r.RecentEventLog)
 	r.elMu.RUnlock()
 
 	telemetry := &Telemetry{
@@ -142,7 +160,7 @@ func (r *MetricsRegistry) GetSnapshot(tokenChan chan struct{}) *Telemetry {
 		},
 		AggregateSummary: agg,
 		Targets:          snapshot,
-		EventLog:         eventsCopy,
+		RecentEventLog:   eventsCopy,
 	}
 	return telemetry
 }
