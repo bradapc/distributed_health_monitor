@@ -28,5 +28,10 @@
     "url": "https://github.com/",
     "interval": "5s",
     "timeout": "2s"
-  }
+  },
+{
+"url": "https://discord.com/",
+"interval": "1s",
+"timeout": "1s"
+}
 ]
